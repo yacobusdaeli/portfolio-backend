@@ -1,10 +1,15 @@
 import { NextResponse } from 'next/server'
 
 export function corsHeaders(origin: string | null) {
-  const allowed = (process.env.CORS_ALLOWED_ORIGINS ?? '').split(',').map(s => s.trim())
-  const isAllowed = !origin || allowed.includes(origin) || allowed.includes('*')
+  const cleanOrigin = origin ? origin.replace(/\/+$/, '') : null
+  const allowed = (process.env.CORS_ALLOWED_ORIGINS ?? '')
+    .split(',')
+    .map(s => s.trim().replace(/\/+$/, ''))
+    .filter(Boolean)
+
+  const isAllowed = !cleanOrigin || allowed.includes(cleanOrigin) || allowed.includes('*')
   return {
-    'Access-Control-Allow-Origin': isAllowed ? (origin ?? '*') : allowed[0],
+    'Access-Control-Allow-Origin': isAllowed ? (cleanOrigin ?? '*') : (allowed[0] || '*'),
     'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     'Access-Control-Max-Age': '86400',
