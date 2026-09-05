@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -182,10 +182,11 @@ function GalleryField({ projectId, value, onChange }: {
   const fileRefs = useRef<(HTMLInputElement | null)[]>([])
 
   const uploadGalleryImage = async (i: number, file: File) => {
-    if (!projectId) return alert('Simpan project terlebih dahulu sebelum upload gambar.')
     const supabase = createClient()
-    const ext = file.name.split('.').pop()
-    const path = `gallery/${projectId}-${value[i].id}.${ext}`
+    const ext = file.name.split('.').pop() || 'png'
+    const identifier = projectId || `proj-${Date.now()}`
+    const galleryId = value[i].id || `g-${i}-${Date.now()}`
+    const path = `gallery/${identifier}-${galleryId}.${ext}`
     const { error } = await supabase.storage.from('project-images').upload(path, file, { upsert: true })
     if (error) return alert('Upload gagal: ' + error.message)
     const { data } = supabase.storage.from('project-images').getPublicUrl(path)
@@ -268,11 +269,11 @@ export default function ProjectForm({ initial, mode }: ProjectFormProps) {
   const set = (field: string, value: unknown) => setForm(f => ({ ...f, [field]: value }))
 
   const uploadMainImage = async (file: File) => {
-    if (!initial?.id) return alert('Simpan project terlebih dahulu, lalu upload gambar utama.')
     setImageUploading(true)
     const supabase = createClient()
-    const ext = file.name.split('.').pop()
-    const path = `${initial.id}-main.${ext}`
+    const ext = file.name.split('.').pop() || 'png'
+    const identifier = initial?.id || (form.slug ? form.slug : `proj-${Date.now()}`)
+    const path = `${identifier}-main.${ext}`
     const { error: upErr } = await supabase.storage.from('project-images').upload(path, file, { upsert: true })
     if (upErr) { alert('Upload failed: ' + upErr.message); setImageUploading(false); return }
     const { data } = supabase.storage.from('project-images').getPublicUrl(path)
