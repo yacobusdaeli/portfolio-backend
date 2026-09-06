@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
@@ -52,6 +52,20 @@ function IconSun() {
     </svg>
   )
 }
+function IconMenu() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/>
+    </svg>
+  )
+}
+function IconClose() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+    </svg>
+  )
+}
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
@@ -59,6 +73,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [userEmail, setUserEmail] = useState('')
   const [theme, setTheme] = useState<'light'|'dark'>('dark')
   const [pageTitle, setPageTitle] = useState('Dashboard')
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   useEffect(() => {
     const saved = localStorage.getItem('admin-theme') as 'light'|'dark' || 'dark'
@@ -79,6 +94,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     else if (pathname === '/admin/projects/create') setPageTitle('New Project')
     else if (pathname.includes('/admin/projects/edit')) setPageTitle('Edit Project')
     else setPageTitle('Admin')
+    setSidebarOpen(false)
   }, [pathname])
 
   const toggleTheme = () => {
@@ -96,10 +112,23 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const isActive = (path: string) => pathname === path || pathname.startsWith(path + '/')
 
+  if (pathname === '/admin/login') {
+    return <>{children}</>
+  }
+
   return (
     <div className="admin-shell">
+      {/* Mobile Backdrop */}
+      {sidebarOpen && (
+        <div 
+          className="sidebar-backdrop" 
+          onClick={() => setSidebarOpen(false)} 
+          aria-hidden="true" 
+        />
+      )}
+
       {/* Sidebar */}
-      <aside className="admin-sidebar">
+      <aside className={`admin-sidebar ${sidebarOpen ? 'open' : ''}`}>
         <div className="sidebar-brand">
           <div className="sidebar-logo">YD</div>
           <div>
@@ -110,14 +139,19 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         <nav className="sidebar-nav">
           <span className="sidebar-section-label">Navigation</span>
-          <Link href="/admin" className={isActive('/admin') && pathname === '/admin' ? 'active' : ''}>
+          <Link 
+            href="/admin" 
+            className={isActive('/admin') && pathname === '/admin' ? 'active' : ''}
+            onClick={() => setSidebarOpen(false)}
+          >
             <IconGrid /> Dashboard
           </Link>
-          <Link href="/admin/projects" className={pathname.startsWith('/admin/projects') ? 'active' : ''}>
+          <Link 
+            href="/admin/projects" 
+            className={pathname.startsWith('/admin/projects') ? 'active' : ''}
+            onClick={() => setSidebarOpen(false)}
+          >
             <IconFolder /> Projects
-          </Link>
-          <Link href="/admin/projects/create" className={pathname === '/admin/projects/create' ? 'active' : ''}>
-            <IconPlus /> New Project
           </Link>
         </nav>
 
@@ -139,7 +173,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       {/* Main */}
       <div className="admin-main">
         <header className="admin-topbar">
-          <span className="admin-topbar-title">{pageTitle}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <button 
+              type="button" 
+              className="mobile-menu-btn" 
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              aria-label="Toggle navigation menu"
+            >
+              {sidebarOpen ? <IconClose /> : <IconMenu />}
+            </button>
+            <span className="admin-topbar-title">{pageTitle}</span>
+          </div>
           <div className="admin-topbar-actions">
             <button className="theme-toggle" onClick={toggleTheme} title="Toggle theme">
               {theme === 'dark' ? <IconSun /> : <IconMoon />}

@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
@@ -38,11 +38,20 @@ export default function ProjectsListPage() {
   const handleDelete = async () => {
     if (!deleteId) return
     setDeleting(true)
-    const supabase = createClient()
-    await supabase.from('projects').delete().eq('id', deleteId)
-    setProjects(ps => ps.filter(p => p.id !== deleteId))
-    setDeleteId(null)
-    setDeleting(false)
+    try {
+      const res = await fetch(`/api/projects/${deleteId}`, { method: 'DELETE' })
+      if (!res.ok) {
+        const json = await res.json()
+        throw new Error(json.error || 'Gagal menghapus project')
+      }
+      setProjects(ps => ps.filter(p => p.id !== deleteId))
+      setDeleteId(null)
+    } catch (err: unknown) {
+      const e = err as { message?: string }
+      alert(e.message || 'Gagal menghapus project')
+    } finally {
+      setDeleting(false)
+    }
   }
 
   if (loading) return (
@@ -89,7 +98,13 @@ export default function ProjectsListPage() {
                   <div className="empty-state">
                     <div className="empty-state-icon">📂</div>
                     <div className="empty-state-title">Belum ada project</div>
-                    <div className="empty-state-desc">Klik "New Project" untuk menambahkan.</div>
+                    <div className="empty-state-desc">Tambahkan project pertama Anda ke portfolio.</div>
+                    <Link href="/admin/projects/create" className="btn btn-primary btn-sm" style={{ marginTop: 12 }}>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                      </svg>
+                      New Project
+                    </Link>
                   </div>
                 </td></tr>
               )}

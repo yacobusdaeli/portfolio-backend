@@ -51,5 +51,12 @@ export const ProjectInsertSchema = z.object({
 
 export const ProjectUpdateSchema = ProjectInsertSchema.partial()
 
+export const ProjectPatchSchema = z.object({
+  published: z.boolean().optional(),
+  featured: z.boolean().optional(),
+  order_index: z.number().int().optional(),
+})
+
 export type ProjectInsertInput = z.infer<typeof ProjectInsertSchema>
 export type ProjectUpdateInput = z.infer<typeof ProjectUpdateSchema>
+export type ProjectPatchInput = z.infer<typeof ProjectPatchSchema>

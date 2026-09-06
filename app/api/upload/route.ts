@@ -6,28 +6,23 @@ export async function OPTIONS(request: Request) {
   return handleOptions(request)
 }
 
-// POST /api/projects/[id]/image — upload image to Supabase Storage
-export async function POST(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+// POST /api/upload - upload image for new or existing project using service role
+export async function POST(request: Request) {
   const origin = request.headers.get('origin')
   try {
     // Auth check using requireAuth helper
     const { errorResponse: authError } = await requireAuth(origin)
     if (authError) return authError
 
-    const { id } = await params
     const formData = await request.formData()
     const file = formData.get('file') as File | null
-    const type = (formData.get('type') as string) || 'main' // 'main' or 'gallery'
-    const galleryId = formData.get('galleryId') as string | null
-
-    if (!file) return errorResponse('No file provided', 400, origin)
+    const folder = (formData.get('folder') as string) || 'uploads'
 
     const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
     const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/jpg']
     const ALLOWED_EXTENSIONS = ['jpg', 'jpeg', 'png']
+
+    if (!file) return errorResponse('No file provided', 400, origin)
 
     if (file.size > MAX_FILE_SIZE) {
       return errorResponse('Ukuran file melebihi batas maksimal 5MB', 400, origin)
@@ -37,9 +32,9 @@ export async function POST(
     if (!ALLOWED_MIME_TYPES.includes(file.type) || !ALLOWED_EXTENSIONS.includes(ext)) {
       return errorResponse('Format file tidak didukung. Hanya gambar format JPEG, JPG, dan PNG yang diperbolehkan', 400, origin)
     }
-    const fileName = type === 'gallery' && galleryId
-      ? `gallery/${id}-${galleryId}.${ext}`
-      : `${id}-main.${ext}`
+
+    const cleanName = file.name.replace(/\.[^/.]+$/, '').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 30)
+    const fileName = `${folder}/${Date.now()}-${cleanName}.${ext}`
 
     const supabase = createServiceRoleClient()
     const { error: uploadError } = await supabase.storage
@@ -52,9 +47,9 @@ export async function POST(
       .from('project-images')
       .getPublicUrl(fileName)
 
-    return jsonResponse({ url: urlData.publicUrl }, 201, origin)
+    return jsonResponse({ url: urlData.publicUrl, fileName }, 201, origin)
   } catch (err) {
-    console.error('[POST /api/projects/:id/image]', err)
+    console.error('[POST /api/upload]', err)
     return errorResponse('Failed to upload image', 500, origin)
   }
 }

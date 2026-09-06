@@ -1,6 +1,6 @@
-﻿import { createServiceRoleClient } from '@/lib/supabase/server'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { ProjectUpdateSchema } from '@/lib/validations/project'
+import { createServiceRoleClient } from '@/lib/supabase/server'
+import { requireAuth } from '@/lib/auth'
+import { ProjectUpdateSchema, ProjectPatchSchema } from '@/lib/validations/project'
 import { handleOptions, jsonResponse, errorResponse } from '@/lib/cors'
 
 export async function OPTIONS(request: Request) {
@@ -34,9 +34,9 @@ export async function PUT(
 ) {
   const origin = request.headers.get('origin')
   try {
-    const authClient = await createServerSupabaseClient()
-    const { data: { user }, error: authError } = await authClient.auth.getUser()
-    if (authError || !user) return errorResponse('Unauthorized', 401, origin)
+    const { errorResponse: authError } = await requireAuth(origin)
+    if (authError) return authError
+
     const { id } = await params
     const body = await request.json()
     const parsed = ProjectUpdateSchema.safeParse(body)
@@ -50,12 +50,24 @@ export async function PUT(
       .eq('id', id)
       .select()
       .single()
-    if (error) throw error
+    if (error) {
+      if (error.code === '23505') return errorResponse('Slug already exists', 409, origin)
+      throw error
+    }
     return jsonResponse(data, 200, origin)
   } catch (err) {
     console.error('[PUT /api/projects/:id]', err)
     return errorResponse('Failed to update project', 500, origin)
   }
+}
+
+function extractStoragePath(url: string | null | undefined, bucketName = 'project-images'): string | null {
+  if (!url) return null
+  const marker = `/${bucketName}/`
+  const idx = url.indexOf(marker)
+  if (idx === -1) return null
+  const pathWithQuery = url.substring(idx + marker.length)
+  return decodeURIComponent(pathWithQuery.split('?')[0])
 }
 
 export async function DELETE(
@@ -64,13 +76,46 @@ export async function DELETE(
 ) {
   const origin = request.headers.get('origin')
   try {
-    const authClient = await createServerSupabaseClient()
-    const { data: { user }, error: authError } = await authClient.auth.getUser()
-    if (authError || !user) return errorResponse('Unauthorized', 401, origin)
+    const { errorResponse: authError } = await requireAuth(origin)
+    if (authError) return authError
+
     const { id } = await params
     const supabase = createServiceRoleClient()
+
+    // 1. Fetch project before deletion to retrieve associated storage image paths
+    const { data: project } = await supabase
+      .from('projects')
+      .select('id, image_url, gallery')
+      .eq('id', id)
+      .single()
+
+    // 2. Delete row from database
     const { error } = await supabase.from('projects').delete().eq('id', id)
     if (error) throw error
+
+    // 3. Remove associated images from Supabase Storage
+    if (project) {
+      const pathsToDelete: string[] = []
+      const mainPath = extractStoragePath(project.image_url)
+      if (mainPath) pathsToDelete.push(mainPath)
+
+      if (Array.isArray(project.gallery)) {
+        project.gallery.forEach((g: any) => {
+          const gPath = extractStoragePath(g?.image_url)
+          if (gPath) pathsToDelete.push(gPath)
+        })
+      }
+
+      if (pathsToDelete.length > 0) {
+        const { error: storageErr } = await supabase.storage
+          .from('project-images')
+          .remove(pathsToDelete)
+        if (storageErr) {
+          console.error('[DELETE /api/projects/:id] Failed to delete storage files:', storageErr)
+        }
+      }
+    }
+
     return jsonResponse({ success: true }, 200, origin)
   } catch (err) {
     console.error('[DELETE /api/projects/:id]', err)
@@ -84,15 +129,19 @@ export async function PATCH(
 ) {
   const origin = request.headers.get('origin')
   try {
-    const authClient = await createServerSupabaseClient()
-    const { data: { user }, error: authError } = await authClient.auth.getUser()
-    if (authError || !user) return errorResponse('Unauthorized', 401, origin)
+    const { errorResponse: authError } = await requireAuth(origin)
+    if (authError) return authError
+
     const { id } = await params
     const body = await request.json()
+    const parsed = ProjectPatchSchema.safeParse(body)
+    if (!parsed.success) {
+      return jsonResponse({ error: 'Validation failed', issues: parsed.error.issues }, 422, origin)
+    }
     const supabase = createServiceRoleClient()
     const { data, error } = await supabase
       .from('projects')
-      .update({ ...body, updated_at: new Date().toISOString() })
+      .update({ ...parsed.data, updated_at: new Date().toISOString() })
       .eq('id', id)
       .select('id, published, featured')
       .single()
