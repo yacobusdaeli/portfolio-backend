@@ -27,7 +27,7 @@ export async function GET(request: Request) {
     const from = (page - 1) * limit
     const to = from + limit - 1
 
-    const SUMMARY_FIELDS = 'id, slug, title, subtitle, badge, image_url, tags, technologies, demo_url, github_url, featured, order_index, created_at'
+    const SUMMARY_FIELDS = 'id, slug, title, subtitle, description, overview, badge, image_url, tags, technologies, demo_url, github_url, featured, order_index, created_at'
 
     const supabase = createServiceRoleClient()
     let query = supabase
